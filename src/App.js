@@ -146,6 +146,9 @@ function App() {
   const [editingCardId, setEditingCardId] = useState(null);
   const [editingCardTitle, setEditingCardTitle] = useState('');
   const [editingCardContent, setEditingCardContent] = useState('');
+
+  // Scroll indicator state
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   
   
   // Listen for storage events from other tabs
@@ -190,15 +193,35 @@ function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Auto-scroll to bottom whenever tasks change
+  // Check for overflow and show scroll indicator
   useEffect(() => {
-    setTimeout(() => {
-      const taskListContainer = document.querySelector('.task-list-container');
-      if (taskListContainer) {
-        taskListContainer.scrollTop = taskListContainer.scrollHeight;
+    const checkOverflow = () => {
+      const container = document.querySelector('.task-list-container');
+      if (container) {
+        const hasOverflow = container.scrollHeight > container.clientHeight + 10; // Add small buffer
+        const notAtTop = container.scrollTop > 20; // Show when scrolled down a bit
+        setShowScrollIndicator(hasOverflow && notAtTop);
       }
-    }, 100);
+    };
+
+    // Initial check
+    setTimeout(checkOverflow, 100);
+
+    // Check on scroll
+    const container = document.querySelector('.task-list-container');
+    if (container) {
+      container.addEventListener('scroll', checkOverflow, { passive: true });
+
+      // Check when window resizes
+      window.addEventListener('resize', checkOverflow);
+
+      return () => {
+        container.removeEventListener('scroll', checkOverflow);
+        window.removeEventListener('resize', checkOverflow);
+      };
+    }
   }, [tasks]);
+
 
   // Safe localStorage save function with backup
   const safeSaveToLocalStorage = (key, data) => {
@@ -380,14 +403,6 @@ function App() {
       };
       setTasks([...tasks, newTask]);
       setInputValue('');
-
-      // Auto-scroll to bottom after adding new task
-      setTimeout(() => {
-        const taskListContainer = document.querySelector('.task-list-container');
-        if (taskListContainer) {
-          taskListContainer.scrollTop = taskListContainer.scrollHeight;
-        }
-      }, 100);
     }
   };
 
@@ -515,6 +530,19 @@ function App() {
           📌
         </button>
       </div>
+
+      {/* Scroll Indicator */}
+      {showScrollIndicator && (
+        <div className="scroll-indicator" onClick={() => {
+          const container = document.querySelector('.task-list-container');
+          if (container) {
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}>
+          <div className="scroll-arrow">↑</div>
+          <span className="scroll-text">More tasks</span>
+        </div>
+      )}
 
       <div className="task-list-container">
         <div className="task-list">
