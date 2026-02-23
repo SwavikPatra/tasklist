@@ -90,6 +90,16 @@ body {
   transform: translateY(-1px);
 }
 
+.counter-item.clickable {
+  cursor: pointer;
+}
+
+.counter-item.clickable:hover {
+  background: rgba(16, 185, 129, 0.2);
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
 .light-mode .counter-item {
   background: rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -97,6 +107,10 @@ body {
 
 .light-mode .counter-item:hover {
   background: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .counter-item.clickable:hover {
+  background: rgba(16, 185, 129, 0.15);
 }
 
 .counter-dot {
@@ -113,6 +127,16 @@ body {
 .counter-dot.progress-dot {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.counter-dot.done-dot {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.counter-dot.all-dot {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
 }
 
 .counter-label {
@@ -338,16 +362,33 @@ body {
   transform: scale(1.06) translateX(-3%);
   position: relative;
   margin: 8px 40px 8px 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 25px rgba(139, 92, 246, 0.6), 0 0 50px rgba(124, 58, 237, 0.4), 0 0 20px rgba(139, 92, 246, 0.5);
   z-index: 10;
-  border: 1px solid rgba(167, 139, 250, 0.3);
+  border: 2px solid rgba(167, 139, 250, 0.5);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-item.status-in-progress:hover {
   transform: scale(1.08) translateX(-3%);
-  box-shadow: 0 4px 25px rgba(139, 92, 246, 0.6), 0 0 50px rgba(124, 58, 237, 0.4), 0 0 20px rgba(139, 92, 246, 0.5);
-  border: 2px solid rgba(167, 139, 250, 0.5);
+  box-shadow: 0 6px 30px rgba(139, 92, 246, 0.8), 0 0 60px rgba(124, 58, 237, 0.5), 0 0 30px rgba(139, 92, 246, 0.6);
+  border: 2px solid rgba(167, 139, 250, 0.7);
+}
+
+.task-item.status-done {
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: scale(1.04) translateX(-1.5%);
+  position: relative;
+  margin: 8px 40px 8px 0;
+  box-shadow: 0 4px 25px rgba(16, 185, 129, 0.5), 0 0 40px rgba(5, 150, 105, 0.3), 0 0 15px rgba(16, 185, 129, 0.4);
+  z-index: 9;
+  border: 2px solid rgba(52, 211, 153, 0.5);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.task-item.status-done:hover {
+  transform: scale(1.06) translateX(-1.5%);
+  box-shadow: 0 6px 30px rgba(16, 185, 129, 0.7), 0 0 50px rgba(5, 150, 105, 0.4), 0 0 25px rgba(16, 185, 129, 0.5);
+  border: 2px solid rgba(52, 211, 153, 0.7);
 }
 
 @keyframes borderPulse {
@@ -417,6 +458,10 @@ body {
 }
 
 .task-item.status-in-progress .status-indicator {
+  opacity: 0.9;
+}
+
+.task-item.status-done .status-indicator {
   opacity: 0.9;
 }
 
@@ -698,6 +743,11 @@ body {
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.15s ease;
+}
+
+/* Higher z-index for dialogs that appear on top of other dialogs */
+.confirm-dialog-overlay.top-level {
+  z-index: 5000;
 }
 
 .confirm-dialog {
@@ -1743,4 +1793,175 @@ body {
     height: 32px;
     font-size: 12px;
   }
+}
+
+/* Bulk Action Dialog */
+.bulk-action-dialog {
+  min-width: 400px;
+}
+
+.bulk-action-buttons {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.bulk-action-btn {
+  flex: 1;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bulk-action-btn.archive-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.bulk-action-btn.archive-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.bulk-action-btn.delete-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
+.bulk-action-btn.delete-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+}
+
+.bulk-action-cancel-btn {
+  width: 100%;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  margin-top: 8px;
+}
+
+.light-mode .bulk-action-cancel-btn {
+  background: rgba(0, 0, 0, 0.06);
+  color: #4a5568;
+}
+
+.bulk-action-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.light-mode .bulk-action-cancel-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Bulk Confirmation Input */
+.bulk-confirm-input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  outline: none;
+  transition: all 0.2s ease;
+  margin: 12px 0;
+}
+
+.light-mode .bulk-confirm-input {
+  background: rgba(0, 0, 0, 0.05);
+  color: #2d3748;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.bulk-confirm-input:focus {
+  border: 2px solid #667eea;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.light-mode .bulk-confirm-input:focus {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.bulk-confirm-input::placeholder {
+  opacity: 0.5;
+}
+
+/* Delete Archive Checkbox */
+.delete-archive-checkbox-container {
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.light-mode .delete-archive-checkbox-container {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.delete-archive-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.delete-archive-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.delete-archive-checkbox-label span {
+  font-size: 14px;
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.light-mode .delete-archive-checkbox-label span {
+  color: #4a5568;
+}
+
+.confirm-dialog-btn.confirm.danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.confirm-dialog-btn.confirm.danger:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.confirm-dialog-btn.confirm.danger:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* All counter hover effect */
+.counter-item.all-counter.clickable:hover {
+  background: rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+}
+
+.light-mode .counter-item.all-counter.clickable:hover {
+  background: rgba(245, 158, 11, 0.15);
 }

@@ -95,6 +95,12 @@ function App() {
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState(null);
 
+  // Bulk action dialog state
+  const [bulkActionDialog, setBulkActionDialog] = useState(null);
+  const [bulkConfirmInput, setBulkConfirmInput] = useState('');
+  const [deleteArchiveCheckbox, setDeleteArchiveCheckbox] = useState(false);
+  const [archiveDeleteConfirmDialog, setArchiveDeleteConfirmDialog] = useState(null);
+
 
 
   // Single click handler for emoji picker
@@ -102,8 +108,8 @@ function App() {
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === 'archived') return;
 
-    // Open emoji picker for todo and in-progress tasks
-    if (task.status === 'todo' || task.status === 'in-progress') {
+    // Open emoji picker for todo, in-progress, and done tasks
+    if (task.status === 'todo' || task.status === 'in-progress' || task.status === 'done') {
       // Calculate position below the task
       const taskElement = taskRefs.current[taskId];
       if (taskElement) {
@@ -240,6 +246,11 @@ function App() {
           t.id === taskId ? { ...t, status: 'in-progress', reaction: '🟢' } : t
         ));
       } else if (task.status === 'in-progress') {
+        // Move to done
+        setTasks(tasks.map(t =>
+          t.id === taskId ? { ...t, status: 'done', reaction: '✅' } : t
+        ));
+      } else if (task.status === 'done') {
         // Confirm before archiving
         setConfirmDialog({
           title: 'Archive Task',
@@ -291,6 +302,11 @@ function App() {
       case 'moveInProgress':
         setTasks(tasks.map(t =>
           t.id === contextMenu.id ? { ...t, status: 'in-progress', reaction: '🟢' } : t
+        ));
+        break;
+      case 'moveDone':
+        setTasks(tasks.map(t =>
+          t.id === contextMenu.id ? { ...t, status: 'done', reaction: '✅' } : t
         ));
         break;
       case 'moveArchive':
@@ -467,6 +483,105 @@ function App() {
     setEditingCardContent('');
   };
 
+  // Move all done tasks to archive
+  const handleMoveAllDoneToArchive = () => {
+    const doneTasks = tasks.filter(t => t.status === 'done');
+    if (doneTasks.length === 0) return;
+
+    setConfirmDialog({
+      title: 'Archive All Done Tasks',
+      message: `Move ${doneTasks.length} done task${doneTasks.length > 1 ? 's' : ''} to archive?`,
+      onConfirm: () => {
+        setTasks(tasks.map(t =>
+          t.status === 'done'
+            ? { ...t, status: 'archived', completedAt: new Date().toISOString() }
+            : t
+        ));
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  // Handle All counter click - show bulk action dialog
+  const handleAllCounterClick = () => {
+    const activeTasks = tasks.filter(t => t.status !== 'archived').length;
+    if (activeTasks === 0) return;
+
+    setBulkActionDialog({
+      mode: null, // 'archive' or 'delete' - set when user clicks button
+      activeTaskCount: activeTasks
+    });
+    setBulkConfirmInput('');
+    setDeleteArchiveCheckbox(false);
+  };
+
+  // Handle archive all active tasks
+  const handleArchiveAll = () => {
+    setBulkActionDialog({ ...bulkActionDialog, mode: 'archive' });
+    setBulkConfirmInput('');
+  };
+
+  // Handle delete all tasks
+  const handleDeleteAll = () => {
+    setBulkActionDialog({ ...bulkActionDialog, mode: 'delete' });
+    setBulkConfirmInput('');
+  };
+
+  // Confirm bulk archive
+  const confirmBulkArchive = () => {
+    if (bulkConfirmInput.toLowerCase() !== 'archive') return;
+
+    setTasks(tasks.map(t =>
+      t.status !== 'archived'
+        ? { ...t, status: 'archived', completedAt: new Date().toISOString() }
+        : t
+    ));
+    setBulkActionDialog(null);
+    setBulkConfirmInput('');
+  };
+
+  // Confirm bulk delete
+  const confirmBulkDelete = () => {
+    if (bulkConfirmInput.toLowerCase() !== 'delete') return;
+
+    if (deleteArchiveCheckbox) {
+      // Delete all tasks including archived
+      setTasks([]);
+    } else {
+      // Delete only active tasks, keep archived
+      setTasks(tasks.filter(t => t.status === 'archived'));
+    }
+    setBulkActionDialog(null);
+    setBulkConfirmInput('');
+    setDeleteArchiveCheckbox(false);
+  };
+
+  // Handle archive checkbox click
+  const handleDeleteArchiveCheckbox = () => {
+    const archivedCount = tasks.filter(t => t.status === 'archived').length;
+    if (archivedCount === 0) {
+      setDeleteArchiveCheckbox(!deleteArchiveCheckbox);
+      return;
+    }
+
+    // Show confirmation dialog with higher z-index
+    setArchiveDeleteConfirmDialog({
+      title: 'Delete All Archive Data',
+      message: `Are you sure you want to delete ${archivedCount} archived task${archivedCount > 1 ? 's' : ''} too? This cannot be undone.`,
+      onConfirm: () => {
+        setDeleteArchiveCheckbox(true);
+        setArchiveDeleteConfirmDialog(null);
+      }
+    });
+  };
+
+  // Close bulk action dialog
+  const closeBulkActionDialog = () => {
+    setBulkActionDialog(null);
+    setBulkConfirmInput('');
+    setDeleteArchiveCheckbox(false);
+  };
+
   // Close context menu on click outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -517,6 +632,24 @@ function App() {
           <span className="counter-dot progress-dot"></span>
           <span className="counter-label">On it</span>
           <span className="counter-number">{tasks.filter(t => t.status === 'in-progress').length}</span>
+        </div>
+        <div
+          className={`counter-item ${tasks.filter(t => t.status === 'done').length > 0 ? 'clickable' : ''}`}
+          onClick={tasks.filter(t => t.status === 'done').length > 0 ? handleMoveAllDoneToArchive : undefined}
+          title={tasks.filter(t => t.status === 'done').length > 0 ? 'Click to archive all done tasks' : ''}
+        >
+          <span className="counter-dot done-dot"></span>
+          <span className="counter-label">Done</span>
+          <span className="counter-number">{tasks.filter(t => t.status === 'done').length}</span>
+        </div>
+        <div
+          className={`counter-item all-counter ${tasks.filter(t => t.status !== 'archived').length > 0 ? 'clickable' : ''}`}
+          onClick={tasks.filter(t => t.status !== 'archived').length > 0 ? handleAllCounterClick : undefined}
+          title={tasks.filter(t => t.status !== 'archived').length > 0 ? 'Click for bulk actions' : ''}
+        >
+          <span className="counter-dot all-dot"></span>
+          <span className="counter-label">All</span>
+          <span className="counter-number">{tasks.filter(t => t.status !== 'archived').length}</span>
         </div>
       </div>
 
@@ -591,7 +724,7 @@ function App() {
                     {/* Status indicator */}
                     <div className="task-actions">
                       <span className="status-indicator">
-                        {task.status === 'in-progress' ? 'on it' : task.status === 'todo' ? 'todo' : ''}
+                        {task.status === 'in-progress' ? 'on it' : task.status === 'done' ? 'done' : task.status === 'todo' ? 'todo' : ''}
                       </span>
                     </div>
 
@@ -703,15 +836,23 @@ function App() {
                 )}
 
                 {/* Move to In Progress */}
-                {contextMenu.status !== 'in-progress' && (
+                {contextMenu.status !== 'in-progress' && contextMenu.status !== 'done' && contextMenu.status !== 'archived' && (
                   <div className="context-menu-item" onClick={() => handleContextAction('moveInProgress')}>
                     <span>▶️</span>
                     <span>Move to In Progress</span>
                   </div>
                 )}
 
-                {/* Move to Archive */}
-                {contextMenu.status !== 'archived' && (
+                {/* Move to Done */}
+                {contextMenu.status !== 'done' && contextMenu.status !== 'archived' && contextMenu.status !== 'todo' && (
+                  <div className="context-menu-item" onClick={() => handleContextAction('moveDone')}>
+                    <span>✅</span>
+                    <span>Move to Done</span>
+                  </div>
+                )}
+
+                {/* Move to Archive - only show for done tasks */}
+                {contextMenu.status === 'done' && (
                   <div className="context-menu-item" onClick={() => handleContextAction('moveArchive')}>
                     <span>📦</span>
                     <span>Move to Archive</span>
@@ -758,6 +899,33 @@ function App() {
               <button
                 className="confirm-dialog-btn confirm"
                 onClick={confirmDialog.onConfirm}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Delete Confirmation Dialog (Higher z-index) */}
+      {archiveDeleteConfirmDialog && (
+        <div className="confirm-dialog-overlay top-level" onClick={() => setArchiveDeleteConfirmDialog(null)}>
+          <div
+            className="confirm-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="confirm-dialog-title">{archiveDeleteConfirmDialog.title}</h3>
+            <p className="confirm-dialog-message">{archiveDeleteConfirmDialog.message}</p>
+            <div className="confirm-dialog-actions">
+              <button
+                className="confirm-dialog-btn cancel"
+                onClick={() => setArchiveDeleteConfirmDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-dialog-btn confirm"
+                onClick={archiveDeleteConfirmDialog.onConfirm}
               >
                 Confirm
               </button>
@@ -967,6 +1135,136 @@ function App() {
                     ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Action Dialog */}
+      {bulkActionDialog && !bulkActionDialog.mode && (
+        <div className="confirm-dialog-overlay" onClick={closeBulkActionDialog}>
+          <div
+            className="confirm-dialog bulk-action-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="confirm-dialog-title">Bulk Actions</h3>
+            <p className="confirm-dialog-message">
+              You have {bulkActionDialog.activeTaskCount} active task{bulkActionDialog.activeTaskCount > 1 ? 's' : ''}. What would you like to do?
+            </p>
+            <div className="bulk-action-buttons">
+              <button
+                className="bulk-action-btn archive-btn"
+                onClick={handleArchiveAll}
+              >
+                📦 Archive All
+              </button>
+              <button
+                className="bulk-action-btn delete-btn"
+                onClick={handleDeleteAll}
+              >
+                🗑️ Delete All
+              </button>
+            </div>
+            <button
+              className="bulk-action-cancel-btn"
+              onClick={closeBulkActionDialog}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Archive Confirmation */}
+      {bulkActionDialog && bulkActionDialog.mode === 'archive' && (
+        <div className="confirm-dialog-overlay" onClick={closeBulkActionDialog}>
+          <div
+            className="confirm-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="confirm-dialog-title">Archive All Tasks</h3>
+            <p className="confirm-dialog-message">
+              This will archive {bulkActionDialog.activeTaskCount} task{bulkActionDialog.activeTaskCount > 1 ? 's' : ''}.<br /><br />
+              Type <strong>"archive"</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              className="bulk-confirm-input"
+              value={bulkConfirmInput}
+              onChange={(e) => setBulkConfirmInput(e.target.value)}
+              placeholder="Type 'archive' here"
+              autoFocus
+            />
+            <div className="confirm-dialog-actions">
+              <button
+                className="confirm-dialog-btn cancel"
+                onClick={closeBulkActionDialog}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-dialog-btn confirm"
+                onClick={confirmBulkArchive}
+                disabled={bulkConfirmInput.toLowerCase() !== 'archive'}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation */}
+      {bulkActionDialog && bulkActionDialog.mode === 'delete' && (
+        <div className="confirm-dialog-overlay" onClick={closeBulkActionDialog}>
+          <div
+            className="confirm-dialog bulk-delete-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="confirm-dialog-title">Delete All Tasks</h3>
+            <p className="confirm-dialog-message">
+              This will delete {bulkActionDialog.activeTaskCount} task{bulkActionDialog.activeTaskCount > 1 ? 's' : ''}.<br /><br />
+              Type <strong>"delete"</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              className="bulk-confirm-input"
+              value={bulkConfirmInput}
+              onChange={(e) => setBulkConfirmInput(e.target.value)}
+              placeholder="Type 'delete' here"
+              autoFocus
+            />
+            <div className="delete-archive-checkbox-container">
+              <label className="delete-archive-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={deleteArchiveCheckbox}
+                  onChange={(e) => {
+                    if (e.target.checked && !deleteArchiveCheckbox) {
+                      handleDeleteArchiveCheckbox();
+                    } else {
+                      setDeleteArchiveCheckbox(e.target.checked);
+                    }
+                  }}
+                  className="delete-archive-checkbox"
+                />
+                <span>Also delete {tasks.filter(t => t.status === 'archived').length} archived task{tasks.filter(t => t.status === 'archived').length !== 1 ? 's' : ''}</span>
+              </label>
+            </div>
+            <div className="confirm-dialog-actions">
+              <button
+                className="confirm-dialog-btn cancel"
+                onClick={closeBulkActionDialog}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-dialog-btn confirm danger"
+                onClick={confirmBulkDelete}
+                disabled={bulkConfirmInput.toLowerCase() !== 'delete'}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
