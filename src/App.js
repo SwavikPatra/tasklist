@@ -1,140 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sun, Moon, Pin, Archive } from 'lucide-react';
 import './App.css';
 
+// Reaction emojis for picker (WhatsApp style)
+const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '😡', '🎉', '🔥', '👏', '🙏'];
+
 function App() {
+  const taskRefs = useRef({});
   const [tasks, setTasks] = useState(() => {
-    // Load tasks from localStorage on initial render with backup fallback
-    const loadTasksWithBackup = () => {
-      try {
-        const savedTasks = localStorage.getItem('tasks');
-        if (savedTasks) {
-          const parsedTasks = JSON.parse(savedTasks);
-          // Validate that it's an array
-          if (Array.isArray(parsedTasks)) {
-            // Filter out tasks older than 2 days that are completed
-            const filteredTasks = parsedTasks.filter(task => {
-              // Basic task validation
-              if (!task || typeof task !== 'object' || !task.id) {
-                return false;
-              }
-              if (task.completed) {
-                const completionTime = new Date(task.completedAt);
-                const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-                return completionTime > twoDaysAgo;
-              }
-              return true;
-            });
-            return filteredTasks;
-          } else {
-            console.warn('Invalid tasks data found in localStorage, trying backup...');
-          }
+    try {
+      const savedTasks = localStorage.getItem('tasks');
+      if (savedTasks) {
+        const parsedTasks = JSON.parse(savedTasks);
+        if (Array.isArray(parsedTasks)) {
+          return parsedTasks.filter(task => task && typeof task === 'object' && task.id);
         }
-      } catch (error) {
-        console.error('Error loading tasks from localStorage:', error);
       }
-
-      // Try to restore from backup if main load failed
-      try {
-        const backup = localStorage.getItem('tasks_backup');
-        if (backup) {
-          const parsedBackup = JSON.parse(backup);
-          if (parsedBackup.truncated) {
-            console.warn('Restoring from truncated backup for tasks');
-            return parsedBackup.data || [];
-          } else if (Array.isArray(parsedBackup)) {
-            console.info('Successfully restored tasks from backup');
-            const filteredTasks = parsedBackup.filter(task => {
-              if (!task || typeof task !== 'object' || !task.id) {
-                return false;
-              }
-              if (task.completed) {
-                const completionTime = new Date(task.completedAt);
-                const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-                return completionTime > twoDaysAgo;
-              }
-              return true;
-            });
-            return filteredTasks;
-          }
-        }
-      } catch (backupError) {
-        console.error('Error restoring backup for tasks:', backupError);
-      }
-
-      console.warn('No valid tasks data found, starting fresh');
-      return [];
-    };
-
-    return loadTasksWithBackup();
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    }
+    return [];
   });
+
   const [inputValue, setInputValue] = useState('');
   const [darkMode, setDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem('darkMode');
       return saved ? JSON.parse(saved) : false;
-    } catch (error) {
-      console.error('Error loading dark mode from localStorage:', error);
+    } catch {
       return false;
     }
   });
 
+  // Archive state
+  const [showArchive, setShowArchive] = useState(false);
+
   // Important Stuff state
   const [showImportantStuff, setShowImportantStuff] = useState(false);
   const [importantCards, setImportantCards] = useState(() => {
-    // Load important cards with fallback to backup
-    const loadImportantCards = () => {
-      try {
-        const saved = localStorage.getItem('importantCards');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            // Validate card structure
-            const validCards = parsed.filter(card =>
-              card &&
-              typeof card === 'object' &&
-              card.id &&
-              card.title &&
-              card.content
-            );
-            return validCards;
-          } else {
-            console.warn('Invalid important cards data found, trying backup...');
-          }
+    try {
+      const saved = localStorage.getItem('importantCards');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(card => card && typeof card === 'object' && card.id);
         }
-      } catch (error) {
-        console.error('Error loading important cards from localStorage:', error);
       }
-
-      // Try to restore from backup
-      try {
-        const backup = localStorage.getItem('importantCards_backup');
-        if (backup) {
-          const parsedBackup = JSON.parse(backup);
-          if (parsedBackup.truncated) {
-            console.warn('Restoring from truncated backup for important cards');
-            return parsedBackup.data || [];
-          } else if (Array.isArray(parsedBackup)) {
-            console.info('Successfully restored important cards from backup');
-            const validCards = parsedBackup.filter(card =>
-              card &&
-              typeof card === 'object' &&
-              card.id &&
-              card.title &&
-              card.content
-            );
-            return validCards;
-          }
-        }
-      } catch (backupError) {
-        console.error('Error restoring backup for important cards:', backupError);
-      }
-
-      console.warn('No valid important cards data found, starting fresh');
-      return [];
-    };
-
-    return loadImportantCards();
+    } catch (error) {
+      console.error('Error loading cards:', error);
+    }
+    return [];
   });
+
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardContent, setNewCardContent] = useState('');
@@ -147,246 +64,114 @@ function App() {
   const [editingCardTitle, setEditingCardTitle] = useState('');
   const [editingCardContent, setEditingCardContent] = useState('');
 
-  // Scroll indicator state
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
-  
-  
-  // Listen for storage events from other tabs
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'tasks') {
-        try {
-          if (e.newValue) {
-            const newTasks = JSON.parse(e.newValue);
-            if (Array.isArray(newTasks)) {
-              setTasks(newTasks);
-            }
-          } else {
-            setTasks([]);
-          }
-        } catch (error) {
-          console.error('Error parsing tasks from storage event:', error);
-        }
-      } else if (e.key === 'importantCards') {
-        try {
-          if (e.newValue) {
-            const newCards = JSON.parse(e.newValue);
-            if (Array.isArray(newCards)) {
-              setImportantCards(newCards);
-            }
-          } else {
-            setImportantCards([]);
-          }
-        } catch (error) {
-          console.error('Error parsing important cards from storage event:', error);
-        }
-      } else if (e.key === 'darkMode') {
-        try {
-          setDarkMode(e.newValue ? JSON.parse(e.newValue) : false);
-        } catch (error) {
-          console.error('Error parsing dark mode from storage event:', error);
-        }
-      }
-    };
+  // Emoji picker state (WhatsApp style bottom sheet)
+  const [emojiPickerTaskId, setEmojiPickerTaskId] = useState(null);
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 });
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+  // Swipe states
+  const [swipeTaskId, setSwipeTaskId] = useState(null);
+  const [swipeStartX, setSwipeStartX] = useState(0);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  // Refs for storing callbacks to avoid dependency issues
+  const onDoubleClickRef = useRef(null);
+  const onClickRef = useRef(null);
+  const doubleClickTimeoutRef = useRef(null);
+  const lastClickTimeRef = useRef(0);
+
+  // Double click handler for edit mode
+  const handleTaskDoubleClick = useCallback((taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === 'archived') return;
+
+    setEditingTaskId(taskId);
+    setEditingTaskText(task.text);
+  }, [tasks]);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState(null);
+
+
+
+  // Single click handler for emoji picker
+  const handleTaskClick = useCallback((e, taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === 'archived') return;
+
+    // Open emoji picker for todo and in-progress tasks
+    if (task.status === 'todo' || task.status === 'in-progress') {
+      // Calculate position below the task
+      const taskElement = taskRefs.current[taskId];
+      if (taskElement) {
+        const rect = taskElement.getBoundingClientRect();
+        setEmojiPickerPosition({
+          top: rect.bottom + 8,
+          left: rect.left
+        });
+      }
+      setEmojiPickerTaskId(taskId);
+    }
+  }, [tasks]);
+
+  // Update refs when callbacks change
+  onDoubleClickRef.current = handleTaskDoubleClick;
+  onClickRef.current = handleTaskClick;
+
+  // Optimized double click handler - inline to avoid dependency issues
+  const handleTaskInteract = useCallback((e, taskId) => {
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastClickTimeRef.current;
+
+    if (timeDiff < 250) {
+      // Double click detected
+      if (doubleClickTimeoutRef.current) {
+        clearTimeout(doubleClickTimeoutRef.current);
+        doubleClickTimeoutRef.current = null;
+      }
+      if (onDoubleClickRef.current) {
+        onDoubleClickRef.current(taskId);
+      }
+      lastClickTimeRef.current = 0;
+    } else {
+      // Single click - wait to see if it becomes a double click
+      lastClickTimeRef.current = currentTime;
+      doubleClickTimeoutRef.current = setTimeout(() => {
+        doubleClickTimeoutRef.current = null;
+        if (onClickRef.current) {
+          onClickRef.current(e, taskId);
+        }
+      }, 250);
+    }
   }, []);
 
-  // Check for overflow and show scroll indicator
+  // Save to localStorage
   useEffect(() => {
-    const checkOverflow = () => {
-      const container = document.querySelector('.task-list-container');
-      if (container) {
-        const hasOverflow = container.scrollHeight > container.clientHeight + 10; // Add small buffer
-        const notAtTop = container.scrollTop > 20; // Show when scrolled down a bit
-        setShowScrollIndicator(hasOverflow && notAtTop);
-      }
-    };
-
-    // Initial check
-    setTimeout(checkOverflow, 100);
-
-    // Check on scroll
-    const container = document.querySelector('.task-list-container');
-    if (container) {
-      container.addEventListener('scroll', checkOverflow, { passive: true });
-
-      // Check when window resizes
-      window.addEventListener('resize', checkOverflow);
-
-      return () => {
-        container.removeEventListener('scroll', checkOverflow);
-        window.removeEventListener('resize', checkOverflow);
-      };
+    try {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    } catch (error) {
+      console.error('Error saving tasks:', error);
     }
   }, [tasks]);
 
-
-  // Safe localStorage save function with backup
-  const safeSaveToLocalStorage = (key, data) => {
-    try {
-      const dataString = JSON.stringify(data);
-      localStorage.setItem(key, dataString);
-
-      // Create backup for critical data
-      if (key === 'tasks' || key === 'importantCards') {
-        localStorage.setItem(`${key}_backup`, dataString);
-        localStorage.setItem(`${key}_timestamp`, Date.now().toString());
-      }
-    } catch (error) {
-      console.error(`Error saving ${key} to localStorage:`, error);
-      // Handle quota exceeded error
-      if (error.name === 'QuotaExceededError') {
-        console.warn('localStorage quota exceeded, trying to clear old data...');
-        try {
-          // Clear old backups first
-          const tasksBackup = localStorage.getItem('tasks_backup');
-          const cardsBackup = localStorage.getItem('importantCards_backup');
-
-          // Try to remove old backups and save again
-          localStorage.removeItem('tasks_backup');
-          localStorage.removeItem('importantCards_backup');
-          localStorage.setItem(key, JSON.stringify(data));
-
-          // Create new backup with smaller data
-          if (key === 'tasks' || key === 'importantCards') {
-            const minimalData = {
-              data: data.slice(0, 100), // Keep only first 100 items
-              truncated: true,
-              timestamp: Date.now()
-            };
-            localStorage.setItem(`${key}_backup`, JSON.stringify(minimalData));
-          }
-        } catch (fallbackError) {
-          console.error('Fallback save also failed:', fallbackError);
-        }
-      }
-    }
-  };
-
-  // Restore from backup if main data is corrupted
-  const restoreFromBackup = (key) => {
-    try {
-      const backup = localStorage.getItem(`${key}_backup`);
-      const timestamp = localStorage.getItem(`${key}_timestamp`);
-
-      if (backup && timestamp) {
-        const backupAge = Date.now() - parseInt(timestamp);
-        const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-        if (backupAge < maxAge) {
-          const parsedBackup = JSON.parse(backup);
-
-          // Check if it's truncated backup
-          if (parsedBackup.truncated) {
-            console.warn(`Restoring from truncated backup for ${key}`);
-            return parsedBackup.data;
-          } else {
-            console.info(`Restoring from backup for ${key}`);
-            return parsedBackup;
-          }
-        } else {
-          console.warn(`Backup for ${key} is too old (${backupAge}ms)`);
-          localStorage.removeItem(`${key}_backup`);
-          localStorage.removeItem(`${key}_timestamp`);
-        }
-      }
-    } catch (error) {
-      console.error(`Error restoring backup for ${key}:`, error);
-    }
-    return null;
-  };
-
-  // Save tasks to localStorage whenever they change
   useEffect(() => {
-    safeSaveToLocalStorage('tasks', tasks);
-  }, [tasks]);
-
-  // Save dark mode preference
-  useEffect(() => {
-    safeSaveToLocalStorage('darkMode', darkMode);
+    try {
+      localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    } catch (error) {
+      console.error('Error saving dark mode:', error);
+    }
   }, [darkMode]);
 
-  // Save important cards to localStorage
   useEffect(() => {
-    safeSaveToLocalStorage('importantCards', importantCards);
+    try {
+      localStorage.setItem('importantCards', JSON.stringify(importantCards));
+    } catch (error) {
+      console.error('Error saving cards:', error);
+    }
   }, [importantCards]);
-
-  // Clean up completed tasks older than 2 days and health check
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Clean up old completed tasks
-      setTasks(prevTasks =>
-        prevTasks.filter(task => {
-          if (task.completed) {
-            const completionTime = new Date(task.completedAt);
-            const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-            return completionTime > twoDaysAgo;
-          }
-          return true;
-        })
-      );
-
-      // Perform data health check
-      const dataHealthCheck = () => {
-        try {
-          // Check localStorage accessibility
-          const testKey = 'health_check_' + Date.now();
-          localStorage.setItem(testKey, 'test');
-          localStorage.removeItem(testKey);
-
-          // Validate tasks data structure
-          const tasksData = localStorage.getItem('tasks');
-          if (tasksData) {
-            const parsed = JSON.parse(tasksData);
-            if (!Array.isArray(parsed)) {
-              console.warn('Tasks data corruption detected, attempting backup restore');
-              const backup = restoreFromBackup('tasks');
-              if (backup) {
-                safeSaveToLocalStorage('tasks', backup);
-              }
-            }
-          }
-
-          // Validate important cards data structure
-          const cardsData = localStorage.getItem('importantCards');
-          if (cardsData) {
-            const parsed = JSON.parse(cardsData);
-            if (!Array.isArray(parsed)) {
-              console.warn('Important cards data corruption detected, attempting backup restore');
-              const backup = restoreFromBackup('importantCards');
-              if (backup) {
-                safeSaveToLocalStorage('importantCards', backup);
-              }
-            }
-          }
-
-          // Clean up old backups (older than 30 days)
-          const maxBackupAge = 30 * 24 * 60 * 60 * 1000;
-          const tasksTimestamp = localStorage.getItem('tasks_timestamp');
-          const cardsTimestamp = localStorage.getItem('importantCards_timestamp');
-
-          if (tasksTimestamp && (Date.now() - parseInt(tasksTimestamp)) > maxBackupAge) {
-            localStorage.removeItem('tasks_backup');
-            localStorage.removeItem('tasks_timestamp');
-          }
-
-          if (cardsTimestamp && (Date.now() - parseInt(cardsTimestamp)) > maxBackupAge) {
-            localStorage.removeItem('importantCards_backup');
-            localStorage.removeItem('importantCards_timestamp');
-          }
-
-        } catch (error) {
-          console.error('Data health check failed:', error);
-        }
-      };
-
-      dataHealthCheck();
-    }, 60 * 60 * 1000); // Check every hour
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -397,33 +182,231 @@ function App() {
       const newTask = {
         id: Date.now(),
         text: inputValue.trim(),
-        completed: false,
-        createdAt: Date.now(),
-        completedAt: null
+        status: 'todo',
+        reaction: null,
+        createdAt: Date.now()
       };
       setTasks([...tasks, newTask]);
       setInputValue('');
     }
   };
 
-  const handleTaskComplete = (taskId) => {
-    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-    if (taskElement) {
-      taskElement.classList.add('completing');
-      setTimeout(() => {
-        setTasks(tasks.map(task =>
-          task.id === taskId
-            ? { ...task, completed: true, completedAt: new Date().toISOString() }
-            : task
+  // Swipe handlers
+  const handleSwipeStart = (e, taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === 'archived') return;
+
+    setSwipeTaskId(taskId);
+    setSwipeStartX(e.clientX || e.touches?.[0]?.clientX || 0);
+  };
+
+  const handleSwipeMove = (e) => {
+    if (swipeTaskId === null) return;
+
+    const currentX = e.clientX || e.touches?.[0]?.clientX || 0;
+    const offset = currentX - swipeStartX;
+
+    // Strong resistance - limit swipe to max 60px
+    const maxSwipe = 60;
+    const resistance = 0.2; // Much stronger resistance
+    let clampedOffset = Math.min(0, offset);
+
+    // Apply resistance after passing maxSwipe
+    if (clampedOffset < -maxSwipe) {
+      clampedOffset = -maxSwipe + ((clampedOffset + maxSwipe) * resistance);
+    }
+
+    setSwipeOffset(clampedOffset);
+  };
+
+  const handleSwipeEnd = (taskId) => {
+    if (swipeTaskId !== taskId) {
+      setSwipeOffset(0);
+      return;
+    }
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) {
+      setSwipeOffset(0);
+      setSwipeTaskId(null);
+      return;
+    }
+
+    // Higher threshold: 70px to trigger action (requires deliberate swipe)
+    if (swipeOffset < -70) {
+      if (task.status === 'todo') {
+        // Move to in-progress with green emoji
+        setTasks(tasks.map(t =>
+          t.id === taskId ? { ...t, status: 'in-progress', reaction: '🟢' } : t
         ));
-      }, 800);
-    } else {
+      } else if (task.status === 'in-progress') {
+        // Confirm before archiving
+        setConfirmDialog({
+          title: 'Archive Task',
+          message: 'Move this task to archive?',
+          onConfirm: () => {
+            setTasks(tasks.map(t =>
+              t.id === taskId
+                ? { ...t, status: 'archived', completedAt: new Date().toISOString() }
+                : t
+            ));
+            setConfirmDialog(null);
+          }
+        });
+      }
+    }
+
+    // Bouncy return
+    setSwipeOffset(0);
+    setSwipeTaskId(null);
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e, taskId) => {
+    e.preventDefault();
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    setContextMenu(task);
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleContextAction = (action) => {
+    if (!contextMenu) return;
+
+    switch (action) {
+      case 'edit':
+        setEditingTaskId(contextMenu.id);
+        setEditingTaskText(contextMenu.text);
+        break;
+      case 'moveTodo':
+        setTasks(tasks.map(t =>
+          t.id === contextMenu.id ? { ...t, status: 'todo' } : t
+        ));
+        break;
+      case 'moveInProgress':
+        setTasks(tasks.map(t =>
+          t.id === contextMenu.id ? { ...t, status: 'in-progress', reaction: '🟢' } : t
+        ));
+        break;
+      case 'moveArchive':
+        setConfirmDialog({
+          title: 'Archive Task',
+          message: 'Move this task to archive?',
+          onConfirm: () => {
+            setTasks(tasks.map(t =>
+              t.id === contextMenu.id
+                ? { ...t, status: 'archived', completedAt: new Date().toISOString() }
+                : t
+            ));
+            setConfirmDialog(null);
+            closeContextMenu();
+          }
+        });
+        closeContextMenu();
+        break;
+      case 'restore':
+        setConfirmDialog({
+          title: 'Restore Task',
+          message: `Restore "${contextMenu.text}" to todo list?`,
+          onConfirm: () => {
+            setTasks(tasks.map(t =>
+              t.id === contextMenu.id
+                ? { ...t, status: 'todo', completedAt: null }
+                : t
+            ));
+            setConfirmDialog(null);
+            closeContextMenu();
+          }
+        });
+        closeContextMenu();
+        break;
+      case 'delete':
+        setConfirmDialog({
+          title: 'Delete Task',
+          message: 'Delete this task? This cannot be undone.',
+          onConfirm: () => {
+            setTasks(tasks.filter(t => t.id !== contextMenu.id));
+            setConfirmDialog(null);
+            closeContextMenu();
+          }
+        });
+        closeContextMenu();
+        break;
+      case 'removeReaction':
+        setTasks(tasks.map(t =>
+          t.id === contextMenu.id ? { ...t, reaction: null } : t
+        ));
+        break;
+    }
+    closeContextMenu();
+  };
+
+  // Select reaction
+  const selectReaction = (emoji, taskId) => {
+    setTasks(tasks.map(t =>
+      t.id === taskId ? { ...t, reaction: emoji } : t
+    ));
+    setEmojiPickerTaskId(null);
+  };
+
+  // Remove reaction
+  const removeReaction = (taskId) => {
+    setTasks(tasks.map(t =>
+      t.id === taskId ? { ...t, reaction: null } : t
+    ));
+    setEmojiPickerTaskId(null);
+  };
+
+  // Edit task handlers
+  const handleSaveEditTask = () => {
+    if (editingTaskText.trim() && editingTaskId !== null) {
       setTasks(tasks.map(task =>
-        task.id === taskId
-          ? { ...task, completed: true, completedAt: new Date().toISOString() }
+        task.id === editingTaskId
+          ? { ...task, text: editingTaskText.trim() }
           : task
       ));
     }
+    setEditingTaskId(null);
+    setEditingTaskText('');
+  };
+
+  const handleCancelEditTask = () => {
+    setEditingTaskId(null);
+    setEditingTaskText('');
+  };
+
+  // Archive click handler (restore archived task)
+  const handleArchiveTaskClick = (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    setConfirmDialog({
+      title: 'Restore Task',
+      message: `Restore "${task.text}" to todo list?`,
+      onConfirm: () => {
+        setTasks(tasks.map(t =>
+          t.id === taskId
+            ? { ...t, status: 'todo', completedAt: null }
+            : t
+        ));
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  // Archive context menu handler
+  const handleArchiveContextMenu = (e, taskId) => {
+    e.preventDefault();
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    setContextMenu(task);
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
   };
 
   const toggleDarkMode = () => {
@@ -433,12 +416,20 @@ function App() {
   // Important Stuff handlers
   const handleAddImportantCard = () => {
     if (newCardTitle.trim() && newCardContent.trim()) {
+      const gradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #30cfd0 0%, #330867 100%)'
+      ];
       const newCard = {
         id: Date.now(),
         title: newCardTitle.trim(),
         content: newCardContent.trim(),
         createdAt: new Date().toISOString(),
-        color: getRandomCardColor()
+        color: gradients[Math.floor(Math.random() * gradients.length)]
       };
       setImportantCards([...importantCards, newCard]);
       setNewCardTitle('');
@@ -454,42 +445,7 @@ function App() {
     }
   };
 
-  const getRandomCardColor = () => {
-    const colors = [
-      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-      'linear-gradient(135deg, #30cfd0 0%, #330867 100%)'
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  // Task editing handlers
-  const handleStartEditTask = (taskId, currentText) => {
-    setEditingTaskId(taskId);
-    setEditingTaskText(currentText);
-  };
-
-  const handleSaveEditTask = () => {
-    if (editingTaskText.trim() && editingTaskId !== null) {
-      setTasks(tasks.map(task =>
-        task.id === editingTaskId
-          ? { ...task, text: editingTaskText.trim() }
-          : task
-      ));
-      setEditingTaskId(null);
-      setEditingTaskText('');
-    }
-  };
-
-  const handleCancelEditTask = () => {
-    setEditingTaskId(null);
-    setEditingTaskText('');
-  };
-
-  // Card editing handlers
+  // Card edit handlers
   const handleStartEditCard = (card) => {
     setEditingCardId(card.id);
     setEditingCardTitle(card.title);
@@ -503,11 +459,11 @@ function App() {
           ? { ...card, title: editingCardTitle.trim(), content: editingCardContent.trim() }
           : card
       ));
-      setEditingCardId(null);
-      setEditingCardTitle('');
-      setEditingCardContent('');
-      setViewingCard(null);
     }
+    setEditingCardId(null);
+    setEditingCardTitle('');
+    setEditingCardContent('');
+    setViewingCard(null);
   };
 
   const handleCancelEditCard = () => {
@@ -516,49 +472,92 @@ function App() {
     setEditingCardContent('');
   };
 
-  
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu) {
+        closeContextMenu();
+      }
+    };
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [contextMenu]);
+
   return (
     <div className={`App ${darkMode ? 'dark-mode' : 'light-mode'}`}>
+      {/* Dark Mode Toggle */}
       <div className="dark-mode-toggle">
         <button onClick={toggleDarkMode} className="mode-toggle-btn">
-          {darkMode ? '☀️' : '🌙'}
+          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
       </div>
 
+      {/* Important Stuff Button */}
       <div className="important-stuff-toggle">
         <button onClick={() => setShowImportantStuff(true)} className="important-stuff-btn" title="Important Stuff">
-          📌
+          <Pin size={20} />
         </button>
       </div>
 
-      {/* Scroll Indicator */}
-      {showScrollIndicator && (
-        <div className="scroll-indicator" onClick={() => {
-          const container = document.querySelector('.task-list-container');
-          if (container) {
-            container.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-        }}>
-          <div className="scroll-arrow">↑</div>
-          <span className="scroll-text">More tasks</span>
-        </div>
-      )}
+      {/* Archive Toggle */}
+      <div className="archive-toggle">
+        <button onClick={() => setShowArchive(true)} className="archive-btn" title="Archive">
+          <Archive size={20} />
+        </button>
+      </div>
 
+      {/* Task Counter */}
+      <div className="task-counter">
+        <div className="counter-item">
+          <span className="counter-dot todo-dot"></span>
+          <span className="counter-label">Todo</span>
+          <span className="counter-number">{tasks.filter(t => t.status === 'todo').length}</span>
+        </div>
+        <div className="counter-item">
+          <span className="counter-dot progress-dot"></span>
+          <span className="counter-label">On it</span>
+          <span className="counter-number">{tasks.filter(t => t.status === 'in-progress').length}</span>
+        </div>
+      </div>
+
+      {/* Task List */}
       <div className="task-list-container">
-        <div className="task-list">
+        <div className="task-list"
+          onMouseMove={handleSwipeMove}
+          onMouseUp={() => handleSwipeEnd(swipeTaskId)}
+          onMouseLeave={() => handleSwipeEnd(swipeTaskId)}
+          onTouchMove={handleSwipeMove}
+          onTouchEnd={() => handleSwipeEnd(swipeTaskId)}
+        >
           {tasks
-            .filter(task => !task.completed)
+            .filter(task => task.status !== 'archived')
             .sort((a, b) => a.createdAt - b.createdAt)
             .map(task => (
-              <div key={task.id} className="task-item" data-task-id={task.id}>
+              <div
+                key={task.id}
+                ref={el => taskRefs.current[task.id] = el}
+                className={`task-item status-${task.status || 'todo'} ${editingTaskId === task.id ? 'editing' : ''}`}
+                style={
+                  swipeTaskId === task.id
+                    ? { transform: `translateX(${swipeOffset}px)` }
+                    : {}
+                }
+                onContextMenu={(e) => handleContextMenu(e, task.id)}
+              >
                 {editingTaskId === task.id ? (
-                  <div className="edit-task-form">
+                  // Edit mode
+                  <div className="edit-task-form" onClick={e => e.stopPropagation()}>
                     <input
                       type="text"
                       className="edit-task-input"
                       value={editingTaskText}
                       onChange={(e) => setEditingTaskText(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSaveEditTask();
                         if (e.key === 'Escape') handleCancelEditTask();
                       }}
@@ -567,14 +566,14 @@ function App() {
                     <div className="edit-task-actions">
                       <button
                         className="save-edit-btn"
-                        onClick={handleSaveEditTask}
+                        onClick={(e) => { e.stopPropagation(); handleSaveEditTask(); }}
                         title="Save"
                       >
                         ✓
                       </button>
                       <button
                         className="cancel-edit-btn"
-                        onClick={handleCancelEditTask}
+                        onClick={(e) => { e.stopPropagation(); handleCancelEditTask(); }}
                         title="Cancel"
                       >
                         ×
@@ -582,24 +581,32 @@ function App() {
                     </div>
                   </div>
                 ) : (
+                  // Normal view
                   <>
-                    <span className="task-text">{task.text}</span>
-                    <div className="task-actions">
-                      <button
-                        className="edit-btn"
-                        onClick={() => handleStartEditTask(task.id, task.text)}
-                        title="Edit task"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleTaskComplete(task.id)}
-                        title="Mark as done"
-                      >
-                        ×
-                      </button>
+                    <div className="task-content-wrapper">
+                      {/* Emoji/reaction display */}
+                      {task.reaction && (
+                        <span className="task-emoji">
+                          {task.reaction}
+                        </span>
+                      )}
+                      <span className="task-text">{task.text}</span>
                     </div>
+
+                    {/* Status indicator */}
+                    <div className="task-actions">
+                      <span className="status-indicator">
+                        {task.status === 'in-progress' ? 'on it' : task.status === 'todo' ? 'todo' : ''}
+                      </span>
+                    </div>
+
+                    {/* Swipe overlay for interaction */}
+                    <div
+                      className="task-touch-layer"
+                      onMouseDown={(e) => handleSwipeStart(e, task.id)}
+                      onTouchStart={(e) => handleSwipeStart(e, task.id)}
+                      onClick={(e) => handleTaskInteract(e, task.id)}
+                    />
                   </>
                 )}
               </div>
@@ -607,6 +614,7 @@ function App() {
         </div>
       </div>
 
+      {/* Input */}
       <div className="input-container">
         <div className="input-wrapper">
           <input
@@ -627,20 +635,150 @@ function App() {
         </div>
       </div>
 
+      {/* WhatsApp-style Emoji Picker (appears below task) */}
+      {emojiPickerTaskId && (
+        <div className="emoji-picker-overlay" onClick={() => setEmojiPickerTaskId(null)}>
+          <div
+            className="emoji-picker-sheet"
+            style={{
+              position: 'fixed',
+              top: `${emojiPickerPosition.top}px`,
+              left: `${emojiPickerPosition.left}px`,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="emoji-picker-grid">
+              {REACTION_EMOJIS.map(emoji => (
+                <div
+                  key={emoji}
+                  className="emoji-picker-item"
+                  onClick={() => selectReaction(emoji, emojiPickerTaskId)}
+                >
+                  {emoji}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div className="context-menu-overlay" onClick={closeContextMenu}>
+          <div
+            className="context-menu"
+            style={{
+              position: 'fixed',
+              left: `${contextMenuPosition.x}px`,
+              top: `${contextMenuPosition.y}px`,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Archive-specific options */}
+            {contextMenu.status === 'archived' ? (
+              <>
+                {/* Restore */}
+                <div className="context-menu-item" onClick={() => handleContextAction('restore')}>
+                  <span>↺</span>
+                  <span>Restore to Todo</span>
+                </div>
+
+                <div className="context-menu-divider"></div>
+
+                {/* Delete */}
+                <div className="context-menu-item danger" onClick={() => handleContextAction('delete')}>
+                  <span>🗑️</span>
+                  <span>Delete</span>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Edit */}
+                <div className="context-menu-item" onClick={() => handleContextAction('edit')}>
+                  <span>✏️</span>
+                  <span>Edit</span>
+                </div>
+
+                {/* Move to Todo */}
+                {contextMenu.status !== 'todo' && (
+                  <div className="context-menu-item" onClick={() => handleContextAction('moveTodo')}>
+                    <span>📋</span>
+                    <span>Move to Todo</span>
+                  </div>
+                )}
+
+                {/* Move to In Progress */}
+                {contextMenu.status !== 'in-progress' && (
+                  <div className="context-menu-item" onClick={() => handleContextAction('moveInProgress')}>
+                    <span>▶️</span>
+                    <span>Move to In Progress</span>
+                  </div>
+                )}
+
+                {/* Move to Archive */}
+                {contextMenu.status !== 'archived' && (
+                  <div className="context-menu-item" onClick={() => handleContextAction('moveArchive')}>
+                    <span>📦</span>
+                    <span>Move to Archive</span>
+                  </div>
+                )}
+
+                {/* Remove Reaction */}
+                {contextMenu.reaction && (
+                  <div className="context-menu-item" onClick={() => handleContextAction('removeReaction')}>
+                    <span>❌</span>
+                    <span>Remove Reaction</span>
+                  </div>
+                )}
+
+                <div className="context-menu-divider"></div>
+
+                {/* Delete */}
+                <div className="context-menu-item danger" onClick={() => handleContextAction('delete')}>
+                  <span>🗑️</span>
+                  <span>Delete</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <div className="confirm-dialog-overlay" onClick={() => setConfirmDialog(null)}>
+          <div
+            className="confirm-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="confirm-dialog-title">{confirmDialog.title}</h3>
+            <p className="confirm-dialog-message">{confirmDialog.message}</p>
+            <div className="confirm-dialog-actions">
+              <button
+                className="confirm-dialog-btn cancel"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-dialog-btn confirm"
+                onClick={confirmDialog.onConfirm}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Important Stuff Popup */}
       {showImportantStuff && (
         <div className="popup-overlay" onClick={() => setShowImportantStuff(false)}>
           <div className="popup-content" onClick={e => e.stopPropagation()}>
             <div className="popup-header">
               <h2 className="popup-title">📌 Important Stuff</h2>
-              <button
-                className="close-popup-btn"
-                onClick={() => setShowImportantStuff(false)}
-              >
-                ×
-              </button>
+              <button className="close-popup-btn" onClick={() => setShowImportantStuff(false)}>×</button>
             </div>
-
             <div className="popup-body">
               {importantCards.length === 0 ? (
                 <div className="empty-state">
@@ -659,41 +797,25 @@ function App() {
                       <h3 className="card-preview-title">{card.title}</h3>
                       <p className="card-preview-content">{card.content.substring(0, 100)}...</p>
                       <div className="card-preview-footer">
-                        <span className="card-date">
-                          {new Date(card.createdAt).toLocaleDateString()}
-                        </span>
+                        <span className="card-date">{new Date(card.createdAt).toLocaleDateString()}</span>
                         <div className="card-actions">
                           <button
                             className="card-edit-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartEditCard(card);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); handleStartEditCard(card); }}
                             title="Edit card"
-                          >
-                            ✏️
-                          </button>
+                          >✏️</button>
                           <button
                             className="card-delete-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCard(card.id);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id); }}
                             title="Delete card"
-                          >
-                            🗑️
-                          </button>
+                          >🗑️</button>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-
-              <button
-                className="add-card-btn"
-                onClick={() => setShowAddCard(true)}
-              >
+              <button className="add-card-btn" onClick={() => setShowAddCard(true)}>
                 + Add New Card
               </button>
             </div>
@@ -707,14 +829,8 @@ function App() {
           <div className="popup-content add-card-content" onClick={e => e.stopPropagation()}>
             <div className="popup-header">
               <h2 className="popup-title">📝 Create New Card</h2>
-              <button
-                className="close-popup-btn"
-                onClick={() => setShowAddCard(false)}
-              >
-                ×
-              </button>
+              <button className="close-popup-btn" onClick={() => setShowAddCard(false)}>×</button>
             </div>
-
             <div className="add-card-form">
               <input
                 type="text"
@@ -735,11 +851,7 @@ function App() {
               <div className="add-card-actions">
                 <button
                   className="cancel-btn"
-                  onClick={() => {
-                    setShowAddCard(false);
-                    setNewCardTitle('');
-                    setNewCardContent('');
-                  }}
+                  onClick={() => { setShowAddCard(false); setNewCardTitle(''); setNewCardContent(''); }}
                 >
                   Cancel
                 </button>
@@ -758,12 +870,9 @@ function App() {
 
       {/* View Card Popup */}
       {viewingCard && (
-        <div className="popup-overlay" onClick={() => {
-          if (editingCardId === null) setViewingCard(null);
-        }}>
+        <div className="popup-overlay" onClick={() => { if (editingCardId === null) setViewingCard(null); }}>
           <div className="popup-content view-card-content" onClick={e => e.stopPropagation()}>
             {editingCardId === viewingCard.id ? (
-              // Edit mode
               <>
                 <div className="view-card-header" style={{ background: viewingCard.color }}>
                   <input
@@ -774,23 +883,10 @@ function App() {
                     placeholder="Card title..."
                   />
                   <div className="view-card-actions">
-                    <button
-                      className="save-edit-card-btn"
-                      onClick={handleSaveEditCard}
-                      title="Save"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      className="cancel-edit-card-btn"
-                      onClick={handleCancelEditCard}
-                      title="Cancel"
-                    >
-                      ×
-                    </button>
+                    <button className="save-edit-card-btn" onClick={handleSaveEditCard} title="Save">✓</button>
+                    <button className="cancel-edit-card-btn" onClick={handleCancelEditCard} title="Cancel">×</button>
                   </div>
                 </div>
-
                 <div className="view-card-body">
                   <textarea
                     className="edit-card-content-input"
@@ -808,34 +904,15 @@ function App() {
                 </div>
               </>
             ) : (
-              // View mode
               <>
                 <div className="view-card-header" style={{ background: viewingCard.color }}>
                   <h2 className="view-card-title">{viewingCard.title}</h2>
                   <div className="view-card-actions">
-                    <button
-                      className="view-card-edit-btn"
-                      onClick={() => handleStartEditCard(viewingCard)}
-                      title="Edit card"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="view-card-delete-btn"
-                      onClick={() => handleDeleteCard(viewingCard.id)}
-                      title="Delete card"
-                    >
-                      🗑️
-                    </button>
-                    <button
-                      className="close-popup-btn"
-                      onClick={() => setViewingCard(null)}
-                    >
-                      ×
-                    </button>
+                    <button className="view-card-edit-btn" onClick={() => handleStartEditCard(viewingCard)} title="Edit card">✏️</button>
+                    <button className="view-card-delete-btn" onClick={() => handleDeleteCard(viewingCard.id)} title="Delete card">🗑️</button>
+                    <button className="close-popup-btn" onClick={() => setViewingCard(null)}>×</button>
                   </div>
                 </div>
-
                 <div className="view-card-body">
                   <div className="card-content-text">{viewingCard.content}</div>
                   <div className="card-meta">
@@ -846,6 +923,56 @@ function App() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Archive Popup */}
+      {showArchive && (
+        <div className="popup-overlay" onClick={() => setShowArchive(false)}>
+          <div className="popup-content" onClick={e => e.stopPropagation()}>
+            <div className="popup-header">
+              <h2 className="popup-title">📦 Archive</h2>
+              <button className="close-popup-btn" onClick={() => setShowArchive(false)}>×</button>
+            </div>
+            <div className="popup-body">
+              {tasks.filter(task => task.status === 'archived').length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">📦</div>
+                  <p>No archived tasks yet</p>
+                </div>
+              ) : (
+                <div className="archive-list">
+                  {tasks
+                    .filter(task => task.status === 'archived')
+                    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+                    .map(task => (
+                      <div
+                        key={task.id}
+                        className="archive-item"
+                        onContextMenu={(e) => handleArchiveContextMenu(e, task.id)}
+                      >
+                        <div className="archive-item-content">
+                          {task.reaction && (
+                            <span className="archive-emoji">{task.reaction}</span>
+                          )}
+                          <span className="archive-task-text">{task.text}</span>
+                        </div>
+                        <span className="archive-date">
+                          {task.completedAt && new Date(task.completedAt).toLocaleDateString()}
+                        </span>
+                        <button
+                          className="archive-restore-btn"
+                          onClick={(e) => { e.stopPropagation(); handleArchiveTaskClick(task.id); }}
+                          title="Restore to todo"
+                        >
+                          ↺
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
