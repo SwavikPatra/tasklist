@@ -342,6 +342,8 @@ function App() {
           t.id === contextMenu.id ? { ...t, reaction: null } : t
         ));
         break;
+      default:
+        break;
     }
     closeContextMenu();
   };
@@ -354,13 +356,6 @@ function App() {
     setEmojiPickerTaskId(null);
   };
 
-  // Remove reaction
-  const removeReaction = (taskId) => {
-    setTasks(tasks.map(t =>
-      t.id === taskId ? { ...t, reaction: null } : t
-    ));
-    setEmojiPickerTaskId(null);
-  };
 
   // Edit task handlers
   const handleSaveEditTask = () => {
